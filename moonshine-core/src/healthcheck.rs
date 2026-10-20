@@ -6,7 +6,7 @@ use std::os::unix::io::{AsRawFd, FromRawFd, OwnedFd};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-use pixelforge::{Codec, VideoContext, VideoContextBuilder};
+use pixelforge::{Codec, EncodeBitDepth, PixelFormat, VideoContext, VideoContextBuilder};
 
 use crate::config::Config;
 use crate::session::stream::video::KcmpProbe;
@@ -608,25 +608,90 @@ fn check_codecs(report: &mut HealthReport, context: Option<&VideoContext>) {
 
 	let mut supported = 0u32;
 	let mut names = Vec::new();
+	let mut unsupported = Vec::new();
 
-	if ctx.supports_encode(Codec::H264) {
-		supported |= CODEC_H264;
-		supported |= CODEC_H264_HIGH_8444;
-		names.push("H.264");
-	}
-	if ctx.supports_encode(Codec::H265) {
-		supported |= CODEC_HEVC;
-		supported |= CODEC_HEVC_MAIN10;
-		supported |= CODEC_HEVC_REXT_8444;
-		supported |= CODEC_HEVC_REXT_10444;
-		names.push("HEVC");
-	}
-	if ctx.supports_encode(Codec::AV1) {
-		supported |= CODEC_AV1_MAIN8;
-		supported |= CODEC_AV1_MAIN10;
-		supported |= CODEC_AV1_HIGH_8444;
-		supported |= CODEC_AV1_HIGH_10444;
-		names.push("AV1");
+	// Each entry is a (codec, chroma, bit depth) mode advertised to clients. Probe the
+	// encoder for the exact profile each one needs: GPUs differ (AMD VCN has no 4:4:4,
+	// NVIDIA has no AV1 4:4:4), so advertising by codec alone makes clients fail later.
+	let modes: &[(Codec, PixelFormat, EncodeBitDepth, u32, &str)] = &[
+		(
+			Codec::H264,
+			PixelFormat::Yuv420,
+			EncodeBitDepth::Eight,
+			CODEC_H264,
+			"H.264",
+		),
+		(
+			Codec::H264,
+			PixelFormat::Yuv444,
+			EncodeBitDepth::Eight,
+			CODEC_H264_HIGH_8444,
+			"H.264 4:4:4",
+		),
+		(
+			Codec::H265,
+			PixelFormat::Yuv420,
+			EncodeBitDepth::Eight,
+			CODEC_HEVC,
+			"HEVC",
+		),
+		(
+			Codec::H265,
+			PixelFormat::Yuv420,
+			EncodeBitDepth::Ten,
+			CODEC_HEVC_MAIN10,
+			"HEVC 10-bit",
+		),
+		(
+			Codec::H265,
+			PixelFormat::Yuv444,
+			EncodeBitDepth::Eight,
+			CODEC_HEVC_REXT_8444,
+			"HEVC 4:4:4",
+		),
+		(
+			Codec::H265,
+			PixelFormat::Yuv444,
+			EncodeBitDepth::Ten,
+			CODEC_HEVC_REXT_10444,
+			"HEVC 4:4:4 10-bit",
+		),
+		(
+			Codec::AV1,
+			PixelFormat::Yuv420,
+			EncodeBitDepth::Eight,
+			CODEC_AV1_MAIN8,
+			"AV1",
+		),
+		(
+			Codec::AV1,
+			PixelFormat::Yuv420,
+			EncodeBitDepth::Ten,
+			CODEC_AV1_MAIN10,
+			"AV1 10-bit",
+		),
+		(
+			Codec::AV1,
+			PixelFormat::Yuv444,
+			EncodeBitDepth::Eight,
+			CODEC_AV1_HIGH_8444,
+			"AV1 4:4:4",
+		),
+		(
+			Codec::AV1,
+			PixelFormat::Yuv444,
+			EncodeBitDepth::Ten,
+			CODEC_AV1_HIGH_10444,
+			"AV1 4:4:4 10-bit",
+		),
+	];
+	for &(codec, pixel_format, bit_depth, bit, name) in modes {
+		if ctx.supports_encode_format(codec, pixel_format, bit_depth) {
+			supported |= bit;
+			names.push(name);
+		} else if ctx.supports_encode(codec) {
+			unsupported.push(name);
+		}
 	}
 
 	report.supported_codecs = supported;
@@ -638,7 +703,11 @@ fn check_codecs(report: &mut HealthReport, context: Option<&VideoContext>) {
 			start.elapsed().as_millis() as u64,
 		);
 	} else {
-		report.add_passed("Codecs", names.join(", "), start.elapsed().as_millis() as u64);
+		let mut message = names.join(", ");
+		if !unsupported.is_empty() {
+			message.push_str(&format!("\n  Not supported by this GPU: {}.", unsupported.join(", ")));
+		}
+		report.add_passed("Codecs", message, start.elapsed().as_millis() as u64);
 	}
 }
 
@@ -1061,7 +1130,7 @@ fn check_wsi_layer(report: &mut HealthReport) {
 
 	let found = layers.iter().any(|l| {
 		l.layer_name_as_c_str()
-			.is_ok_and(|name| name.to_bytes() == b"VK_LAYER_MOONSHINE_wsi")
+			.is_ok_and(|name| name.to_bytes() == b"VK_LAYER_FERRISCOPE_wsi_x86_64")
 	});
 
 	if found {
@@ -1069,7 +1138,7 @@ fn check_wsi_layer(report: &mut HealthReport) {
 	} else {
 		report.add_warn(
 			"WSI layer",
-			"  Not found in Vulkan instance layers.\n  Install the moonshine-wsi Vulkan layer.\n  Games will render through XWayland (higher latency, no direct scanout).".into(),
+			"  Not found in Vulkan instance layers.\n  Install the ferriscope-wsi Vulkan layer (ferriscope: tools/install-wsi.sh).\n  Games will render through XWayland (higher latency, no direct scanout).".into(),
 			start.elapsed().as_millis() as u64,
 		);
 	}

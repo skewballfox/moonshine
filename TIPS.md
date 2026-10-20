@@ -11,6 +11,7 @@ See the [Configuration](../README.md#configuration) section of the README for th
 - [Run games in high-performance mode](#run-games-in-high-performance-mode)
 - [Use Gamescope with the client's resolution](#use-gamescope-with-the-clients-resolution)
 - [Run Flatpak Steam inside Moonshine's compositor](#run-flatpak-steam-inside-moonshines-compositor)
+- [Run Flatpak Bottles inside Moonshine's compositor](#run-flatpak-bottles-inside-moonshines-compositor)
 - [Run a desktop environment for a full remote desktop](#run-a-desktop-environment-for-a-full-remote-desktop)
 - [Debug a failing application](#debug-a-failing-application)
 
@@ -24,6 +25,7 @@ Add a `pre_command` that shuts down any running desktop Steam before the stream 
 [[application]]
 title = "Steam"
 command = ["/usr/bin/steam", "steam://open/bigpicture"]
+steam_integration = true
 pre_command = [
     ["/usr/bin/bash", "-c", "if pgrep -x steam >/dev/null; then /usr/bin/steam -shutdown &>/dev/null; for i in $(seq 1 30); do ! pgrep -x steam >/dev/null && break; sleep 1; done; fi"],
 ]
@@ -128,6 +130,7 @@ command = [
 	"com.valvesoftware.Steam",
 	"steam://open/bigpicture",
 ]
+steam_integration = true
 ```
 
 For games launched through Steam's application scanner:
@@ -151,6 +154,31 @@ Flatpak uses the host's D-Bus session bus to communicate with portal backends. W
 
 `dbus-run-session` spawns a fresh D-Bus daemon without the host's portal backend registered, so Flatpak cannot discover the host compositor through the portal and falls back to the environment variables inherited from Moonshine's systemd unit. Because the portal backend is responsible for both Wayland and audio setup, the `PULSE_SERVER` env var is also honored correctly without needing `--env=` overrides.
 
+## Run Flatpak Bottles inside Moonshine's compositor
+
+### How to
+
+Wrap the `command` with `dbus-run-session`, as for Flatpak Steam above:
+
+```toml
+[[application_scanner]]
+type = "bottles"
+command = [
+	"dbus-run-session", "--",
+	"flatpak", "run", "--command=bottles-cli", "com.usebottles.bottles",
+	"run", "-b", "{bottle}", "--program-id", "{program_id}",
+]
+umu_command = [
+	"dbus-run-session", "--",
+	"flatpak", "run", "--command=bottles-cli", "com.usebottles.bottles",
+	"umu", "run", "--game", "{umu_game}",
+]
+```
+
+### Details
+
+The root cause is the same as for Flatpak Steam: the portal backend overrides the `WAYLAND_DISPLAY`/`DISPLAY` variables Moonshine sets, so the game renders on the host's desktop. `dbus-run-session` hides the portal, and Flatpak falls back to Moonshine's environment.
+
 ## Run a desktop environment for a full remote desktop
 
 ### How to
@@ -167,6 +195,8 @@ command = ["/usr/bin/start-cosmic"]
 
 Launching a desktop environment as an application turns the stream into a full remote desktop: the compositor boots inside Moonshine's headless compositor, and you use the desktop's own keybindings to launch programs. Other compositors work the same way, e.g. `["/usr/bin/sway"]`.
 
+Leave Steam integration off (the default) for a desktop: with `steam_integration = true`, only Steam and Steam game windows get focus and keyboard input.
+
 ## Debug a failing application
 
 ### How to
@@ -177,6 +207,7 @@ Set the application's `stdout` and `stderr` to `"journal"` so its output is capt
 [[application]]
 title = "Steam"
 command = ["/usr/bin/steam", "steam://open/bigpicture"]
+steam_integration = true
 stdout = "journal"
 stderr = "journal"
 ```

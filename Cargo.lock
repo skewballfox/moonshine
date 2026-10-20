@@ -177,8 +177,8 @@ dependencies = [
 
 [[package]]
 name = "ash"
-version = "0.38.0+1.4.329"
-source = "git+https://github.com/ash-rs/ash?rev=55dd56906bbb5760e9e9e6c56f45be67f67e0649#55dd56906bbb5760e9e9e6c56f45be67f67e0649"
+version = "0.38.0+1.4.352"
+source = "git+https://github.com/ash-rs/ash?rev=f4c2ca3e4f6b998d5254ad101a32f024d87cdec2#f4c2ca3e4f6b998d5254ad101a32f024d87cdec2"
 dependencies = [
  "libloading",
 ]
@@ -516,6 +516,15 @@ dependencies = [
 
 [[package]]
 name = "block-buffer"
+version = "0.10.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3078c7629b62d3f0439517fa394996acacc5cbc91c5a20d8c658e77abd503a71"
+dependencies = [
+ "generic-array",
+]
+
+[[package]]
+name = "block-buffer"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d2f6c7dbe95a6ed67ad9f18e57daf93a2f034c524b99fd2b76d18fdfeb6660aa"
@@ -615,13 +624,14 @@ checksum = "fc652a48c352aef3ea3aed32080501cf3ef6ed5da78602a020c991775b0aff04"
 
 [[package]]
 name = "calloop"
-version = "0.14.5"
+version = "0.14.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43b32313e937c8721c9d17ee9bf60699a6402b4b7c2cb6ac1bee0ffcaa4b4e5e"
+checksum = "4dbf9978365bac10f54d1d4b04f7ce4427e51f71d61f2fe15e3fed5166474df7"
 dependencies = [
  "bitflags",
  "polling",
  "rustix 1.1.4",
+ "slab",
  "tracing",
 ]
 
@@ -1094,6 +1104,7 @@ version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ed9a281f7bc9b7576e61468ba615a66a5c8cfdff42420a70aa82701a3b1e292"
 dependencies = [
+ "block-buffer 0.10.4",
  "const-oid 0.9.6",
  "crypto-common 0.1.7",
 ]
@@ -1104,7 +1115,7 @@ version = "0.11.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f1dd6dbb5841937940781866fa1281a1ff7bd3bf827091440879f9994983d5c2"
 dependencies = [
- "block-buffer",
+ "block-buffer 0.12.1",
  "const-oid 0.10.2",
  "crypto-common 0.2.2",
 ]
@@ -1127,7 +1138,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1149,15 +1160,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 3.0.3",
-]
-
-[[package]]
-name = "dlib"
-version = "0.5.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab8ecd87370524b461f8557c119c405552c396ed91fc0a8eec68679eab26f94a"
-dependencies = [
- "libloading",
 ]
 
 [[package]]
@@ -1298,7 +1300,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1378,6 +1380,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a86d2bb0db9647ee5dece2ea54a808c14428db009ad751f95b091598835cd0b"
 dependencies = [
  "rayon",
+]
+
+[[package]]
+name = "ferriscope-core"
+version = "0.1.0"
+source = "git+https://github.com/hgaiser/ferriscope?rev=833978d7e0b51e44cc50b674f7bccf7c418a7b6d#833978d7e0b51e44cc50b674f7bccf7c418a7b6d"
+dependencies = [
+ "bitflags",
+ "smithay",
+ "thiserror 2.0.19",
+ "tracing",
+ "wayland-backend",
+ "wayland-scanner",
+ "wayland-server",
 ]
 
 [[package]]
@@ -2182,6 +2198,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "libyaml-rs"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2e126dda6f34391ab7b444f9922055facc83c07a910da3eb16f1e4d9c45dc777"
+
+[[package]]
 name = "linux-raw-sys"
 version = "0.4.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2383,15 +2405,14 @@ dependencies = [
  "ash",
  "async-shutdown",
  "aws-lc-rs",
- "bitflags",
  "byteorder",
  "bytes",
- "calloop",
  "cbc",
  "crossbeam-channel",
  "dasp",
  "dirs",
  "fec-rs",
+ "ferriscope-core",
  "futures-util",
  "gethostname",
  "hex",
@@ -2422,7 +2443,7 @@ dependencies = [
  "sdp-types",
  "serde",
  "serde_json",
- "sha2",
+ "sha2 0.11.0",
  "shellexpand",
  "shlex 2.0.1",
  "smithay",
@@ -2438,10 +2459,9 @@ dependencies = [
  "url",
  "uuid",
  "walkdir",
- "wayland-scanner",
  "which 8.0.5",
  "x509-parser",
- "xcursor",
+ "yaml_serde",
  "zbus",
  "zvariant",
 ]
@@ -2456,17 +2476,6 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
-]
-
-[[package]]
-name = "moonshine-wsi"
-version = "0.16.1"
-dependencies = [
- "ash",
- "libc",
- "wayland-backend",
- "wayland-client",
- "wayland-scanner",
 ]
 
 [[package]]
@@ -2560,7 +2569,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2829,11 +2838,12 @@ dependencies = [
 
 [[package]]
 name = "pixelforge"
-version = "0.9.1"
-source = "git+https://github.com/hgaiser/pixelforge?tag=v0.9.1#2ee4d7ac6e470cc34270e48d6e9d6f3fc1d7c379"
+version = "0.10.0"
+source = "git+https://github.com/hgaiser/pixelforge?tag=v0.10.0#4f3ff5e963a733e4036fd0bcb62df33daeb4ca94"
 dependencies = [
  "ash",
  "futures-channel",
+ "futures-core",
  "thiserror 2.0.19",
  "tracing",
 ]
@@ -3070,7 +3080,7 @@ dependencies = [
  "libc",
  "socket2",
  "tracing",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3435,7 +3445,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3490,6 +3500,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf54715a573b99ac80df0bc206da022bcd442c974952c7b9720069370852e21f"
 
 [[package]]
+name = "ryu"
+version = "1.0.23"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9774ba4a74de5f7b1c1451ed6cd5285a32eddb5cccb8cc655a4e50009e06477f"
+
+[[package]]
 name = "same-file"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3497,12 +3513,6 @@ checksum = "93fc1dc3aaa9bfed95e02e6eadabb4baf7e3078b0bd1b4d7b6b0b68378900502"
 dependencies = [
  "winapi-util",
 ]
-
-[[package]]
-name = "scoped-tls"
-version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e1cf6437eb19a8f4a6cc0f7dca544973b0b78843adbfeb3683d1a94a0024a294"
 
 [[package]]
 name = "scopeguard"
@@ -3585,6 +3595,17 @@ dependencies = [
 
 [[package]]
 name = "sha2"
+version = "0.10.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a7507d819769d01a365ab707794a4084392c824f54a7a6a7862f8c3d0892b283"
+dependencies = [
+ "cfg-if",
+ "cpufeatures 0.2.17",
+ "digest 0.10.7",
+]
+
+[[package]]
+name = "sha2"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "446ba717509524cb3f22f17ecc096f10f4822d76ab5c0b9822c5f9c284e825f4"
@@ -3660,12 +3681,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "siphasher"
-version = "1.0.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "33f4fe9184a62d842c9ef383018f3306d8ba224fd9d836f56d7288308847c256"
-
-[[package]]
 name = "slab"
 version = "0.4.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3680,7 +3695,7 @@ checksum = "8ed6a63f02c8539c91a8685a86f4099661ba3da017932f6ebbea6de3f0fa7c90"
 [[package]]
 name = "smithay"
 version = "0.7.0"
-source = "git+https://github.com/skewballfox/smithay?rev=acbc21cda11bfaca06317c127a95339596c92a6e#acbc21cda11bfaca06317c127a95339596c92a6e"
+source = "git+https://github.com/Smithay/smithay?rev=0ff00983b6007257a7a161a4fe8b14a778e2ac8f#0ff00983b6007257a7a161a4fe8b14a778e2ac8f"
 dependencies = [
  "appendlist",
  "bitflags",
@@ -3707,7 +3722,7 @@ dependencies = [
  "reis",
  "rustix 1.1.4",
  "scopeguard",
- "siphasher",
+ "sha2 0.10.9",
  "smallvec",
  "tempfile",
  "thiserror 2.0.19",
@@ -3879,7 +3894,7 @@ dependencies = [
  "getrandom 0.4.3",
  "once_cell",
  "rustix 1.1.4",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -4358,21 +4373,8 @@ dependencies = [
  "cc",
  "downcast-rs",
  "rustix 1.1.4",
- "scoped-tls",
  "smallvec",
  "wayland-sys",
-]
-
-[[package]]
-name = "wayland-client"
-version = "0.31.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e3c36a0f861ad76d0901f2800b46321410d9f73f2ea88aac0650d86c32688073"
-dependencies = [
- "bitflags",
- "rustix 1.1.4",
- "wayland-backend",
- "wayland-scanner",
 ]
 
 [[package]]
@@ -4443,8 +4445,6 @@ version = "0.31.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d8eab23fefc9e41f8e841df4a9c707e8a8c4ed26e944ef69297184de2785e3be"
 dependencies = [
- "dlib",
- "log",
  "pkg-config",
 ]
 
@@ -4497,7 +4497,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -4739,7 +4739,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7d6f32a0ff4a9f6f01231eb2059cc85479330739333e0e58cadf03b6af2cca10"
 dependencies = [
  "cfg-if",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -4790,12 +4790,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "xcursor"
-version = "0.3.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bec9e4a500ca8864c5b47b8b482a73d62e4237670e5b5f1d6b9e3cae50f28f2b"
-
-[[package]]
 name = "xkbcommon"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4823,6 +4817,19 @@ name = "y4m"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a5a4b21e1a62b67a2970e6831bc091d7b87e119e7f9791aef9702e3bef04448"
+
+[[package]]
+name = "yaml_serde"
+version = "0.10.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "33b729a08a9a6be689bbad3e2bf8015926db54b6622cc89c3a5f7dc174b9e918"
+dependencies = [
+ "indexmap",
+ "itoa",
+ "libyaml-rs",
+ "ryu",
+ "serde",
+]
 
 [[package]]
 name = "yasna"

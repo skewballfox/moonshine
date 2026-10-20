@@ -1,11 +1,11 @@
 use std::collections::HashMap;
-use std::sync::Arc;
 
 use async_shutdown::ShutdownManager;
 use manager::SessionShutdownReason;
 use tokio::sync::watch;
 
 use crate::session::compositor::CompositorConfig;
+use crate::session::stream::StartSignal;
 use crate::session::stream::audio::AudioChannels;
 use crate::session::stream::audio::AudioStream;
 use crate::session::stream::audio::AudioStreamContext;
@@ -160,13 +160,13 @@ impl InitializedSession {
 		let video_stream = VideoStream::new(
 			video_config.clone(),
 			address.clone(),
-			handles.frame_rx,
+			handles.frames,
 			hdr_metadata_tx,
 			stop.clone(),
 			stats_tx,
 		)
 		.await?;
-		let control_stream = ControlStream::new(control_config, address, handles.input_tx, stop.clone())?;
+		let control_stream = ControlStream::new(control_config, address, handles.input, stop.clone())?;
 
 		Ok(Self {
 			context,
@@ -206,7 +206,7 @@ impl InitializedSession {
 				pulse_socket_path,
 				xdisplay: ready.xdisplay,
 				wayland_display: ready.wayland_display.clone(),
-				hdr: ready.hdr,
+				compositor_env: ready.env.clone(),
 				// Populate extra_env with width, height and refreshrate values of the client for e.g. scripting
 				extra_env: HashMap::from([
 					("MOONSHINE_CLIENT_WIDTH".to_string(), context.resolution.0.to_string()),
@@ -257,7 +257,7 @@ impl LaunchedSession {
 		audio_ctx: AudioStreamContext,
 		stop: ShutdownManager<SessionShutdownReason>,
 		inhibit_sleep: bool,
-	) -> Result<(ActiveSession, Arc<tokio::sync::Notify>, Arc<tokio::sync::Notify>), ()> {
+	) -> Result<(ActiveSession, StartSignal, StartSignal), ()> {
 		let Self {
 			context,
 			launched_compositor,
@@ -282,14 +282,14 @@ impl LaunchedSession {
 			.start(video_config, video_ctx, keys_rx.clone(), stop.clone())
 			.map_err(|()| tracing::error!("Failed to start video stream"))?;
 
-		// Start audio stream — gated, returns AudioStartHandle.
+		// Start audio stream — gated, returns its StartSignal.
 		let audio_trigger = audio
 			.start(audio_ctx, keys_rx)
 			.map_err(|()| tracing::error!("Failed to start audio stream"))?;
 
-		// Clone the start notifies for external triggering (e.g. bench binary).
-		let video_start_notify = video_handle.clone_start_notify();
-		let audio_start_notify = audio_trigger.clone_start_notify();
+		// Clone the start flags for external triggering (e.g. bench binary).
+		let video_start = video_handle.start_signal();
+		let audio_start = audio_trigger.clone();
 
 		// Keep a handle to the video stream so a resuming client can reset its
 		// frame counters (see `ActiveSession::reset_video_stream`).
@@ -318,8 +318,8 @@ impl LaunchedSession {
 				video_handle: video_handle_for_resume,
 				sleep_inhibitor,
 			},
-			video_start_notify,
-			audio_start_notify,
+			video_start,
+			audio_start,
 		))
 	}
 }
@@ -339,7 +339,8 @@ impl ActiveSession {
 		&self.context
 	}
 
-	/// Reset the video stream's frame counters and force an IDR for a resuming client.
+	/// Arm a video stream reset (frame counters + forced IDR) for a resuming client.
+	/// It fires once the client's first video PING arrives.
 	pub(crate) fn reset_video_stream(&self) {
 		self.video_handle.request_reset();
 	}

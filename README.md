@@ -118,6 +118,7 @@ The following dependencies are required to build and run:
 sudo pacman -S --asdeps \
    clang \
    cmake \
+   jq \
    libc++ \
    rust
 
@@ -129,7 +130,8 @@ sudo pacman -S \
    libxkbcommon \
    mesa \
    opus \
-   wayland
+   wayland \
+   xorg-xwayland
 ```
 
 Then build:
@@ -149,9 +151,8 @@ sudo modprobe uinput uhid
 sudo install -Dm644 dist/60-moonshine.rules /usr/lib/udev/rules.d/60-moonshine.rules
 sudo udevadm control --reload-rules
 
-# Install the Vulkan WSI layer for game rendering
-sudo install -Dm755 target/release/libmoonshine_wsi.so /usr/lib/moonshine/vulkan-layers/libmoonshine_wsi.so
-sudo install -Dm644 dist/VkLayer_moonshine_wsi.json /usr/share/vulkan/implicit_layer.d/VkLayer_moonshine_wsi.json
+# Install ferriscope's Vulkan WSI layer for game rendering
+dist/install-wsi.sh   # builds as you, asks for sudo only to install
 ```
 
 Then run:
@@ -185,12 +186,14 @@ Each application runs in its own isolated streaming session. Add them to `config
 title = "Steam"
 boxart = "/path/to/steam.png"  # optional
 command = ["/usr/bin/steam", "steam://open/bigpicture"]
+steam_integration = true
 ```
 
 - `title`: The name shown in Moonlight.
 - `boxart` (optional): Path to a cover image.
 - `command`: The command to run. First entry is the executable, the rest are arguments.
 - `pre_command` (optional): Commands to run before launching the application. Each entry is a separate command, executed in order. Runs synchronously — the session waits for all to finish.
+- `steam_integration` (optional): Steam integration, as gamescope's `-e`; off by default. Turn it on for Steam (Big Picture), so its overlay and focus work. With it on, only Steam and Steam game windows can take focus, so leave it off for anything launched directly. Games from the Steam application scanner have it on.
 - `post_command` (optional): Commands to run after the streaming session ends. Each entry is a separate command, executed in order. Runs synchronously — the server waits for all to finish.
 
 Example:
@@ -199,6 +202,7 @@ Example:
 [[application]]
 title = "Steam"
 command = ["/usr/bin/steam", "steam://open/bigpicture"]
+steam_integration = true
 pre_command = [
     ["/usr/bin/systemctl", "stop", "conflicting.service"],
 ]
@@ -276,6 +280,27 @@ Box art is automatically loaded from Heroic's `images-cache/` directory for any 
 
 The default configuration directory is `~/.config/heroic`, falling back to `~/.var/app/com.heroicgameslauncher.hgl/config/heroic` when only the Flatpak is installed.
 You can override it with the `config_dir` option.
+
+**Bottles scanner** — finds games and applications in the [Bottles](https://github.com/bottlesdevs/Bottles) Library tab:
+
+```toml
+[[application_scanner]]
+type = "bottles"
+command = ["bottles-cli", "run", "-b", "{bottle}", "--program-id", "{program_id}"]
+umu_command = ["bottles-cli", "umu", "run", "--game", "{umu_game}"]
+```
+
+Only entries you added to Bottles' Library ("Add to Library" on a program) are exposed — not every program Bottles discovers. UMU entries appear once Bottles reports them as ready, and Steam shortcuts in the Library are skipped. `umu_command` is optional: without it, UMU entries are skipped.
+
+> **Limitation:** Bottles launches executables that live outside the bottle (e.g. on a separate game drive) through `wine start`, which exits immediately, so Moonshine ends the session shortly after launch. Games installed inside the bottle prefix are unaffected.
+
+`{bottle}` is the bottle's name, `{program_id}` the program's internal id, `{name}` the entry's display name, and `{umu_game}` the id of a game managed through Bottles' UMU integration.
+Commands are resolved against Moonshine's own `PATH`, so a bare `bottles-cli` only works for a natively installed Bottles. For Flatpak Bottles, see [TIPS.md](TIPS.md#run-flatpak-bottles-inside-moonshines-compositor).
+
+The default data directory is the first of `~/.local/share/bottles` and `~/.var/app/com.usebottles.bottles/data/bottles` that contains a `library.yml` — leftover data from an uninstalled native Bottles does not shadow the Flatpak install.
+You can override it with the `data_dir` option.
+
+Box art is automatically loaded from Bottles' grid images when available, falling back to the program's icon.
 
 ## Tips & Tricks
 

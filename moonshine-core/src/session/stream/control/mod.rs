@@ -14,10 +14,10 @@ use crate::session::SessionContext;
 use crate::session::SessionKeysReceiver;
 use crate::session::compositor::{
 	frame::{HdrMetadata, HdrModeState},
-	input::CompositorInputEvent,
+	input::CompositorInput,
 };
 use crate::session::manager::SessionShutdownReason;
-use crate::session::stream::audio::AudioStartHandle;
+use crate::session::stream::StartSignal;
 use crate::session::stream::video::VideoStreamHandle;
 
 mod feedback;
@@ -288,10 +288,10 @@ impl ControlStream {
 	pub fn new(
 		config: ControlStreamConfig,
 		address: String,
-		input_tx: calloop::channel::Sender<CompositorInputEvent>,
+		compositor_input: CompositorInput,
 		stop_session_manager: ShutdownManager<SessionShutdownReason>,
 	) -> Result<Self, ()> {
-		let input_handler = InputHandler::new(input_tx, stop_session_manager.clone(), config.gamepad.clone())?;
+		let input_handler = InputHandler::new(compositor_input, stop_session_manager.clone(), config.gamepad.clone())?;
 
 		let socket_address = SocketAddr::new(
 			address
@@ -323,7 +323,7 @@ impl ControlStream {
 		stream_timeout: u64,
 		context: ControlStreamContext,
 		video_handle: VideoStreamHandle,
-		audio_trigger: AudioStartHandle,
+		audio_trigger: StartSignal,
 		hdr_metadata_rx: watch::Receiver<HdrModeState>,
 	) {
 		let Self {
@@ -451,7 +451,7 @@ async fn run_control_loop(
 	stream_timeout: u64,
 	mut host: Host,
 	video_handle: VideoStreamHandle,
-	audio_trigger: AudioStartHandle,
+	audio_trigger: StartSignal,
 	context: ControlStreamContext,
 	input_handler: InputHandler,
 	stop_session_manager: ShutdownManager<SessionShutdownReason>,
