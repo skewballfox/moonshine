@@ -1305,7 +1305,7 @@ dependencies = [
 [[package]]
 name = "ferriscope"
 version = "0.1.0"
-source = "git+https://github.com/hgaiser/ferriscope?rev=a5b1205d7f7c1177a73b3b0896a97b17917c90a5#a5b1205d7f7c1177a73b3b0896a97b17917c90a5"
+source = "git+https://github.com/skewballfox/ferriscope?rev=b4f462c8e06995b0464a1f5d89a9dd9ccc62ce99#b4f462c8e06995b0464a1f5d89a9dd9ccc62ce99"
 dependencies = [
  "bitflags",
  "smithay",
