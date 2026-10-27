@@ -51,6 +51,32 @@ pub struct VideoStreamConfig {
 	/// and 8-byte UDP headers and the 16-byte stream overhead).
 	#[serde(default)]
 	pub max_packet_size: usize,
+
+	/// Size of the video socket's send buffer, in bytes.
+	///
+	/// Data in the send buffer has already left the pipeline, so it isn't
+	/// covered by its frame dropping: when the host's own uplink is slower
+	/// than the bitrate, up to this much video can queue in the kernel. The
+	/// buffer only fills when that uplink is the bottleneck.
+	///
+	/// `0` sizes it to fit a keyframe burst (about eight average frames at the
+	/// stream's bitrate and frame rate), keeping a larger host default. A
+	/// non-zero value sets the size exactly, even below the host default: a
+	/// smaller buffer lowers the worst-case queueing, at the cost of keyframes
+	/// waiting for the socket to drain. The kernel caps it at
+	/// `net.core.wmem_max`.
+	#[serde(default)]
+	pub send_buffer_size: usize,
+
+	/// Whether to lower the frame rate while the client reports losses.
+	///
+	/// When a link further away gets slower than the stream, its packets are
+	/// dropped there and every frame breaks; nothing on the host notices but
+	/// the client, which asks for recovery frames. With this enabled, those
+	/// requests lower an estimate of the rate the link carries, which recovers
+	/// while the client stays quiet, and captures are skipped while it is below
+	/// the bitrate, trading frame rate for frames that arrive whole.
+	pub adapt_to_loss: bool,
 }
 
 /// Smallest accepted packet size cap. Lower values would leave almost no room
@@ -86,8 +112,21 @@ impl Default for VideoStreamConfig {
 			encrypt: false,
 			log_frame_spikes: false,
 			max_packet_size: 0,
+			send_buffer_size: 0,
+			adapt_to_loss: true,
 		}
 	}
+}
+
+/// Average frames a keyframe burst spans, FEC included, for sizing the
+/// socket's send buffer when `send_buffer_size` is automatic.
+const KEYFRAME_BURST_FRAMES: usize = 8;
+
+/// Send buffer size that fits a keyframe burst at `bitrate` (bits per second)
+/// and `fps`.
+fn keyframe_burst_bytes(bitrate: usize, fps: u32) -> usize {
+	let fps = usize::try_from(fps.max(1)).unwrap_or(usize::MAX);
+	bitrate / 8 / fps * KEYFRAME_BURST_FRAMES
 }
 
 /// Per-frame encoding statistics emitted by the video pipeline.
@@ -232,6 +271,9 @@ pub(crate) struct VideoStreamHandle {
 	/// Reference frame invalidation requests, carrying the inclusive
 	/// `[first, last]` client frame-index range the client could not decode.
 	invalidate_tx: broadcast::Sender<(u32, u32)>,
+	/// The client's FEC status reports, as `(missing, parity)` packets of a
+	/// frame it had to repair or lost.
+	fec_status_tx: broadcast::Sender<(u16, u16)>,
 	/// Set by a resume; the packet handler fires the reset on the client's next PING.
 	resume_pending: Arc<AtomicBool>,
 }
@@ -255,6 +297,12 @@ impl VideoStreamHandle {
 	/// reference survives — much cheaper than always re-sending a keyframe.
 	pub fn invalidate_reference_frames(&self, first: u32, last: u32) {
 		let _ = self.invalidate_tx.send((first, last));
+	}
+
+	/// Pass on the client's report that it had to recover `missing` packets of
+	/// a frame with `parity` parity packets, or lost it.
+	pub fn report_fec_status(&self, missing: u16, parity: u16) {
+		let _ = self.fec_status_tx.send((missing, parity));
 	}
 
 	/// Reset the stream's frame/sequence counters for a resuming client.
@@ -333,8 +381,12 @@ impl VideoStream {
 		}
 
 		// Room for a keyframe burst, which is several times the average frame,
-		// plus its FEC: a quarter second of video at the target bitrate.
-		socket.request_send_buffer(context.bitrate / 8 / 4);
+		// unless configured otherwise.
+		if config.send_buffer_size == 0 {
+			socket.grow_send_buffer(keyframe_burst_bytes(context.bitrate, context.fps));
+		} else {
+			socket.set_send_buffer(config.send_buffer_size);
+		}
 
 		// Gate for pipeline + packet handler.
 		let start = StartSignal::new();
@@ -345,6 +397,10 @@ impl VideoStream {
 		// Reference frame invalidation broadcast channel. Sized for a small burst
 		// of loss reports; the encode loop drains all pending each iteration.
 		let (invalidate_tx, _invalidate_rx) = broadcast::channel(16);
+
+		// FEC status broadcast channel. The client batches its reports every
+		// 100 ms; the encode loop drains all pending each iteration.
+		let (fec_status_tx, _fec_status_rx) = broadcast::channel(64);
 
 		// Stream-reset broadcast channel (client reconnect/resume).
 		let (reset_tx, _reset_rx) = broadcast::channel(1);
@@ -374,6 +430,7 @@ impl VideoStream {
 			idr_tx.clone(),
 			idr_tx.subscribe(),
 			invalidate_tx.subscribe(),
+			fec_status_tx.subscribe(),
 			reset_tx.subscribe(),
 			stop.clone(),
 			hdr_metadata_tx,
@@ -386,6 +443,7 @@ impl VideoStream {
 			start,
 			idr_tx,
 			invalidate_tx,
+			fec_status_tx,
 			resume_pending,
 		})
 	}
@@ -554,6 +612,16 @@ mod tests {
 		})
 		.await
 		.expect("sender kept in-flight slots after taking their batches");
+	}
+
+	#[test]
+	fn keyframe_burst_scales_with_frame_size() {
+		// 80 Mbps at 60 fps: ~166 KB average frames.
+		assert_eq!(keyframe_burst_bytes(80_000_000, 60), 166_666 * KEYFRAME_BURST_FRAMES);
+		// Doubling the frame rate halves the frames, and the burst.
+		assert_eq!(keyframe_burst_bytes(80_000_000, 120), 83_333 * KEYFRAME_BURST_FRAMES);
+		// A zero frame rate doesn't divide by zero.
+		assert_eq!(keyframe_burst_bytes(8_000, 0), 1_000 * KEYFRAME_BURST_FRAMES);
 	}
 
 	fn config(max_packet_size: usize) -> VideoStreamConfig {
